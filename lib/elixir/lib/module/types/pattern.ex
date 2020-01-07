@@ -345,37 +345,15 @@ defmodule Module.Types.Pattern do
     {param_types, return_type} = guard_signature(guard, length(args))
     type_guard? = type_guard?(guard)
 
-    # Only check type guards in the context of and/or/not,
+    # Only check type guards in the context of and/or,
     # a type guard in the context of is_tuple(x) > :foo
     # should not affect the inference of x
     if not type_guard? or stack.type_guards_enabled? do
-      arg_stack = %{stack | type_guards_enabled?: type_guard?}
-
-      with {:ok, arg_types, context} <-
-             map_reduce_ok(args, context, &of_guard(&1, arg_stack, &2)),
-           {:ok, context} <- unify_call(param_types, arg_types, stack, context) do
-        {arg_types, guard_sources} =
-          case arg_types do
-            [{:var, index} | rest_arg_types] when type_guard? ->
-              guard_sources =
-                Map.update(context.guard_sources, index, [:guarded], &[:guarded | &1])
-
-              {rest_arg_types, guard_sources}
-
-            _ ->
-              {arg_types, context.guard_sources}
-          end
-
-        guard_sources =
-          Enum.reduce(arg_types, guard_sources, fn
-            {:var, index}, guard_sources ->
-              Map.update(guard_sources, index, [:fail], &[:fail | &1])
-
-            _, guard_sources ->
-              guard_sources
-          end)
-
-        {:ok, return_type, %{context | guard_sources: guard_sources}}
+      case check_guard(args, param_types, type_guard?, stack, context) do
+        # The context for not has to be discarded since we don't handle inverted types
+        {:ok, _context} when guard == :not -> {:ok, return_type, context}
+        {:ok, context} -> {:ok, return_type, context}
+        {:error, reason} -> {:error, reason}
       end
     else
       {:ok, return_type, context}
@@ -390,6 +368,36 @@ defmodule Module.Types.Pattern do
   def of_guard(expr, stack, context) do
     # Fall back to of_pattern/3 for literals
     of_pattern(expr, stack, context)
+  end
+
+  defp check_guard(args, param_types, type_guard?, stack, context) do
+    arg_stack = %{stack | type_guards_enabled?: type_guard?}
+
+    with {:ok, arg_types, context} <-
+           map_reduce_ok(args, context, &of_guard(&1, arg_stack, &2)),
+         {:ok, context} <- unify_call(param_types, arg_types, stack, context) do
+      {arg_types, guard_sources} =
+        case arg_types do
+          [{:var, index} | rest_arg_types] when type_guard? ->
+            guard_sources = Map.update(context.guard_sources, index, [:guarded], &[:guarded | &1])
+
+            {rest_arg_types, guard_sources}
+
+          _ ->
+            {arg_types, context.guard_sources}
+        end
+
+      guard_sources =
+        Enum.reduce(arg_types, guard_sources, fn
+          {:var, index}, guard_sources ->
+            Map.update(guard_sources, index, [:fail], &[:fail | &1])
+
+          _, guard_sources ->
+            guard_sources
+        end)
+
+      {:ok, %{context | guard_sources: guard_sources}}
+    end
   end
 
   defp fresh_context(context) do
