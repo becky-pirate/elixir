@@ -85,8 +85,8 @@ defmodule Module.Types do
       # Track if a variable was infered from a type guard function such is_tuple/1
       # or a guard function that fails such as elem/2, possible values are:
       # `:guarded` when `is_tuple(x)`
+      # `:inverted_guarded` when `not is_tuple(x)`
       # `:fail` when `elem(x, 0)`
-      # `:guarded_fail` when `is_tuple and elem(x, 0)`
       guard_sources: %{}
     }
   end
@@ -103,6 +103,10 @@ defmodule Module.Types do
       # Track if we are in a context where type guard functions should
       # affect inference
       type_guards_enabled?: true,
+      # Track if we are inside an inverting guard, such as `not/1`, we use
+      # this to know when to discard type information when types would be
+      # incorrect due to invertsion
+      inverted_guard?: false,
       # Context used to determine if unification is bi-directional, :expr
       # is directional, :pattern is bi-directional
       context: :pattern

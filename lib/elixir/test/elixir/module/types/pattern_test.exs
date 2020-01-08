@@ -235,6 +235,9 @@ defmodule Module.Types.PatternTest do
 
     assert Types.lift_type({:var, 0}, context) == :atom
 
+    assert {:error, {_, {:unable_unify, :atom, :integer, _, _}, _}} =
+             quoted_guard([x], is_atom(x) and not (Bitwise.band(x, 1) == 0))
+
     assert {:error, {_, {:unable_unify, :tuple, :boolean, _, _}, _}} =
              quoted_guard([x], is_tuple(x) and is_boolean(x))
   end

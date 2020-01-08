@@ -189,6 +189,16 @@ defmodule Module.TypesTest do
              ]) ==
                {:ok, [{:union, [{:list, :dynamic}, :tuple]}]}
 
+      assert {:error, {{:unable_unify, {:list, :dynamic}, :tuple, _, _}, _}} =
+               quoted_head([x], [
+                 (is_list(x) and elem(x, 1)) or (is_tuple(x) and elem(x, 1))
+               ])
+
+      assert {:error, {{:unable_unify, :tuple, {:list, :dynamic}, _, _}, _}} =
+               quoted_head([x], [
+                 (is_list(x) and length(x) == 0) or (is_tuple(x) and length(x) == 0)
+               ])
+
       assert quoted_head([x], [
                (length(x) == 0 and is_list(x)) or (elem(x, 1) and is_tuple(x))
              ]) == {:ok, [{:list, :dynamic}]}
